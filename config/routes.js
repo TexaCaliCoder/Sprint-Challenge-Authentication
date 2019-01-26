@@ -5,7 +5,9 @@ const db = require('../database/dbConfig');
 const Joi = require('joi');
 const validation = require('../helpers/validations')
 
-const { authenticate } = require('../auth/authenticate');
+const {
+  authenticate
+} = require('../auth/authenticate');
 const jwtKey = process.env.JWT_KEY || 'It\'s a secret';
 
 module.exports = server => {
@@ -14,12 +16,12 @@ module.exports = server => {
   server.get('/api/jokes', authenticate, getJokes);
 };
 
-createToken=(user)=>{
-  const payload={
+createToken = (user) => {
+  const payload = {
     username: user.username,
     id: user.id
   };
-  const options={
+  const options = {
     expiresIn: '1.5h',
     jwtid: toString(Date.now())
   }
@@ -30,27 +32,48 @@ createToken=(user)=>{
 function register(req, res) {
   const user = req.body;
   const validateUser = Joi.validate(user, validation.userInput);
-  if(validateUser.error){
-    res.status(406).json({message: "Please make sure you have Username & Password (min 6 chars)"})
-  }else{
+  if (validateUser.error) {
+    res.status(406).json({
+      message: "Please make sure you have Username & Password (min 6 chars)"
+    })
+  } else {
     const hash = bcrypt.hashSync(user.password);
     user.password = hash;
-    db('users').insert(user).then(id=>{
-      res.status(201).json({message: "user created"})
-    })
-    .catch(err=>{
-      res.status(500).send(err)
-    })
+    db('users').insert(user).then(id => {
+        res.status(201).json({
+          message: "user created"
+        })
+      })
+      .catch(err => {
+        res.status(500).send(err)
+      })
   }
 }
 
 function login(req, res) {
-  // implement user login
+  const credentials = req.body;
+  db('users').where('username', credentials.username).first().then(user => {
+    if (user && bcrypt.compareSync(credentials.password, user.password)) {
+      const token = createToken(user);
+      res.json({
+        token,
+        message: 'Welcome Token Holder'
+      })
+    } else {
+      res.status(402).json({
+        message: "Not a chance"
+      })
+    }
+  }).catch(err => {
+    res.status(500).send(err)
+  })
 }
 
 function getJokes(req, res) {
   const requestOptions = {
-    headers: { accept: 'application/json' },
+    headers: {
+      accept: 'application/json'
+    },
   };
 
   axios
@@ -59,6 +82,9 @@ function getJokes(req, res) {
       res.status(200).json(response.data.results);
     })
     .catch(err => {
-      res.status(500).json({ message: 'Error Fetching Jokes', error: err });
+      res.status(500).json({
+        message: 'Error Fetching Jokes',
+        error: err
+      });
     });
 }
